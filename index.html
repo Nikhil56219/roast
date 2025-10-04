@@ -768,7 +768,7 @@
                 return;
             }
             
-            // If the input is already hijacked, just let the user proceed to the Home Base
+            // If the input is already hijacked, the user intended to proceed (since they can't type)
             if (inputElement.readOnly) {
                 window.changeView('home_base');
                 return;
@@ -899,7 +899,8 @@
             // New sarcastic value hidden until input is triggered
             const sarcasticValue = "you really thought , i would give your lazy ass a second chance , click that button and gtfo";
             
-            container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
+            // Increased max-w-xl to max-w-2xl for more horizontal space
+            container.className = 'w-full max-w-2xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
                 <!-- Logo Placeholder (Kept for continuity on this page) -->
                 <img id="app-logo-useless-page" 
@@ -911,9 +912,9 @@
                 <div class="theme-yellow p-6 rounded-xl shadow-lg border-2 border-black theme-black-text mb-8">
                     <h2 class="text-3xl font-bold mb-4 text-center">What is your name?</h2>
                     
-                    <!-- Input: Hijacked if hasFailedUselessPage is true -->
-                    <input id="useless-name-input" type="text" value="${inputValue}" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-6" ${isHijacked ? 'onfocus="window.hijackInput(this)" onkeyup="window.hijackInput(this)"' : ''} ${inputReadOnly}>
-                    
+                    <!-- Textarea: Used for multi-line support when hijacked -->
+                    <textarea id="useless-name-input" rows="3" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-6 resize-none" ${isHijacked ? 'onfocus="window.hijackInput(this)" onkeyup="window.hijackInput(this)"' : ''}></textarea>
+
                     <!-- Button: "I'm gay" style -->
                     <button onclick="window.processUselessName()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
                         I'm gay
@@ -948,7 +949,8 @@
                 `;
             }
             
-            container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
+            // Increased max-w-xl to max-w-2xl for more horizontal space
+            container.className = 'w-full max-w-2xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
                 <!-- Logo Placeholder -->
                 <img id="app-logo-useless-result" 
