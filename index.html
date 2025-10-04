@@ -767,6 +767,12 @@
                 showMessage("Seriously? Enter your pathetic name.", true);
                 return;
             }
+            
+            // If the input is already hijacked, just let the user proceed to the Home Base
+            if (inputElement.readOnly) {
+                window.changeView('home_base');
+                return;
+            }
 
             // --- Case-Insensitive Check ---
             const isFriend = FRIENDS.some(f => f.toLowerCase() === enteredName.toLowerCase());
@@ -791,13 +797,16 @@
         };
         
         // --- INPUT HIJACKING LOGIC ---
-        // Function called when the user types in the input field
+        // Function called when the user focuses/types in the input field AFTER first failure
         window.hijackInput = (inputElement) => {
             const sarcasticMessage = "you really thought , i would give your lazy ass a second chance , click that button and gtfo";
-            // Overwrite the input's current value with the sarcastic message
-            inputElement.value = sarcasticMessage;
-            // Prevent further input by setting maxLength=0 (or by keeping value overwritten)
-            inputElement.readOnly = true; 
+            
+            // Only hijack if the flag is set AND the field isn't already readOnly
+            if (hasFailedUselessPage && !inputElement.readOnly) {
+                inputElement.value = sarcasticMessage;
+                // Lock the field after the message is displayed
+                inputElement.readOnly = true; 
+            }
         };
 
 
@@ -882,9 +891,13 @@
             const isHijacked = hasFailedUselessPage;
             
             // Set the input field properties based on the flag
-            const inputEvents = isHijacked ? 'onkeydown="return false;" onkeyup="window.hijackInput(this)" onfocus="window.hijackInput(this)"' : '';
-            const inputValue = isHijacked ? "you really thought , i would give your lazy ass a second chance , click that button and gtfo" : '';
-            const inputReadOnly = isHijacked ? 'readonly' : '';
+            // Start with an empty value, then overwrite/hijack on focus/key up if needed
+            const inputEvents = isHijacked ? 'onkeydown="return false;" onfocus="window.hijackInput(this)" onkeyup="window.hijackInput(this)"' : '';
+            const inputValue = ''; // Always start with empty value
+            const inputReadOnly = isHijacked ? '' : ''; // Don't set readonly initially
+            
+            // New sarcastic value hidden until input is triggered
+            const sarcasticValue = "you really thought , i would give your lazy ass a second chance , click that button and gtfo";
             
             container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
@@ -899,7 +912,7 @@
                     <h2 class="text-3xl font-bold mb-4 text-center">What is your name?</h2>
                     
                     <!-- Input: Hijacked if hasFailedUselessPage is true -->
-                    <input id="useless-name-input" type="text" value="${inputValue}" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-6" ${inputEvents} ${inputReadOnly}>
+                    <input id="useless-name-input" type="text" value="${inputValue}" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-6" ${isHijacked ? 'onfocus="window.hijackInput(this)" onkeyup="window.hijackInput(this)"' : ''} ${inputReadOnly}>
                     
                     <!-- Button: "I'm gay" style -->
                     <button onclick="window.processUselessName()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
