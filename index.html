@@ -68,6 +68,20 @@
             color: #000000 !important;
             box-shadow: 6px 6px 0 #111111; /* Shifted shadow effect */
         }
+        
+        /* New style for the "Roast them back" button to make it pop */
+        .roast-back-button {
+            background-color: #FFD500 !important;
+            color: #000000 !important;
+            border: 2px solid #000000 !important;
+            font-weight: 800;
+            transition: all 0.2s;
+            box-shadow: 4px 4px 0 #000000;
+        }
+        .roast-back-button:hover {
+            background-color: #FFFFFF !important;
+            box-shadow: 6px 6px 0 #111111;
+        }
 
         /* Large, Edgy Title Style */
         .roast-title {
@@ -122,7 +136,8 @@
         // Set Firebase Log Level to Debug
         setLogLevel('Debug');
 
-        // Global Firebase variables (Canvas provided)
+        // --- GLOBAL CONSTANTS ---
+        const IMAGE_URL = "https://i.ibb.co/27Rt9p5d/Whats-App-Image-2025-10-03-at-19-52-49-ce9f69b5.jpg";
         const appId = 'roast-station-app'; // Hardcoded unique identifier for your app's data path
         
         // ***************************************************************
@@ -136,19 +151,42 @@
         const initialAuthToken = null; // No custom token needed for public deployment, using anonymous sign-in
 
         let app, db, auth, currentUserId = null, currentUserName = null;
+        // FIX: Global state variable for fetched roasts is initialized here to prevent ReferenceError
+        let fetchedRoasts = []; 
+        
         // Page Names: 'spawn_point' (Rules), 'useless_page' (Name Input), 'useless_result' (Name Roast), 'home_base' (Submit/Login), 'the_hit_list' (Inbox), 'roaster_tasks' (Task Admin)
         let currentView = 'spawn_point'; 
-        // UPDATED FRIEND NAMES
-        const FRIENDS = ['Ninjil', 'Sunami', 'ChaiTea', 'MuthMuk'];
+        
+        // UPDATED FRIEND NAMES (Original names used for display/login/target)
+        const FRIENDS = ['Nikhil', 'Sahiti', 'Shanmukh', 'Usmani'];
+        
+        // List of all possible random roasts for the Useless Page (If friend name entered)
+        const FRIEND_ROAST_LINES = [
+            "How do I even pronounce this disaster?",
+            "Who hurt you enough to pick this name?",
+            "Did your parents lose a bet?",
+            "Are you sure this isn’t a typo?",
+            "This sounds like a failed WiFi password.",
+            "And people call you by this voluntarily?",
+            "You really looked at that name and said ‘yeah, this works.’",
+            "Sounds like your parents picked letters out of a Scrabble bag.",
+            "I’ve seen better names on spam emails.",
+            "Your name sounds like an expired coupon code."
+        ];
+        
+        // List of failure roasts (If non-friend name entered)
+        const FAILURE_ROAST_LINES = [
+            "Wow… you really failed at the easiest part",
+            "Not even this small thing",
+            "Can’t handle one little question?",
+            "Seriously… you can’t type your name?",
+            "Even this is too much?",
+            "Wow… too hard for you",
+            "you can’t answer a simple question…",
+            "Can’t type your own name, huh?",
+            "Not even this basic task?"
+        ];
 
-        // Useless Page Roast Definitions - UPDATED KEYS
-        const NAME_ROASTS = {
-            'Ninjil': "Did your parents lose a bet? How do I even pronounce this disaster?",
-            'Sunami': "Your name sounds like a failed attempt to summon a genie. It didn't work.",
-            'ChaiTea': "Sahiti: The only name where a typo improves it. (Wait, that's not right either.)",
-            'MuthMuk': "They ran out of letters, so they just mashed the keyboard for the last three. Shan-mush.",
-            'default': "That name is so boring, we won't even waste a roast on it. Move along, NPC."
-        };
 
         // --- Utility Functions ---
         const getRoastCollectionRef = () => {
@@ -271,7 +309,7 @@
                     <div class="theme-yellow p-8 rounded-xl shadow-2xl border-4 border-black text-center max-w-sm" onclick="event.stopPropagation()">
                         
                         <!-- Logo Placeholder in Modal -->
-                        <img src="https://i.ibb.co/27Rt9p5d/Whats-App-Image-2025-10-03-at-19-52-49-ce9f69b5.jpg" 
+                        <img src="${IMAGE_URL}" 
                              alt="Modal Logo" 
                              class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                         
@@ -352,9 +390,6 @@
             submitRoast(targetName, roastText, determinedSender);
         };
         
-        // State to hold the fetched roasts for the detail view
-        let fetchedRoasts = [];
-
         // Function to fetch all roasts and display them in a list format
         const getRoastsForInbox = async () => {
              if (!db || !currentUserName) return;
@@ -463,6 +498,7 @@
          
          // Function to show the roast detail and the task/reveal status
          window.showRoastDetailModal = async (index) => {
+             // Access the global fetchedRoasts array
              const roast = fetchedRoasts[index];
              if (!roast) return;
              
@@ -479,8 +515,10 @@
              const getTaskUI = (roast, taskStatus) => {
                  // --- Reveal Status Check ---
                  if (roast.isRevealed) {
-                     return `<p class="text-3xl font-extrabold text-red-500 mb-4">IDENTIY REVEALED!</p>
-                             <p class="text-xl font-semibold mb-4 theme-black-text">It was the coward: **${roast.senderName}**</p>`;
+                     return `
+                         <p class="text-3xl font-extrabold text-red-500 mb-4">IDENTIY REVEALED!</p>
+                         <p class="text-xl font-semibold mb-4 theme-black-text">It was the coward: **${roast.senderName}**</p>
+                     `;
                  }
                  
                  // --- Task Status UI ---
@@ -518,11 +556,14 @@
                      
                      <!-- Buttons for Roast Back and Reveal/Close -->
                      <div class="grid grid-cols-3 gap-2 mb-4">
-                         <button onclick="renderReplyRoastForm(fetchedRoasts[${index}])" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 login-button">
+                         <button onclick="window.renderReplyRoastForm(fetchedRoasts[${index}])" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 roast-back-button">
                              Roast them back
                          </button>
                          <button onclick="window.closeModal()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
                              Close
+                         </button>
+                         <button onclick="window.requestRoasterReveal('${roast.id}', '${roast.target}', '${roast.senderName}')" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 login-button">
+                             Want to know who sand this?
                          </button>
                      </div>
 
@@ -724,7 +765,19 @@
                 return;
             }
 
-            window.changeView('useless_result', { name: enteredName });
+            // --- Case-Insensitive Check ---
+            const isFriend = FRIENDS.some(f => f.toLowerCase() === enteredName.toLowerCase());
+
+            let roast;
+            if (isFriend) {
+                // If friend, choose a random FRIEND roast
+                roast = FRIEND_ROAST_LINES[Math.floor(Math.random() * FRIEND_ROAST_LINES.length)];
+            } else {
+                // If non-friend, choose a random FAILURE roast
+                roast = FAILURE_ROAST_LINES[Math.floor(Math.random() * FAILURE_ROAST_LINES.length)];
+            }
+
+            window.changeView('useless_result', { name: enteredName, roast: roast });
         };
         
         // Custom changeView function to handle data passing
@@ -782,7 +835,7 @@
                  <div class="text-center mb-8 p-6 theme-yellow rounded-xl shadow-2xl border-4 border-black">
                      <!-- Logo Placeholder -->
                      <img id="app-logo-rules" 
-                          src="https://placehold.co/96x96/111111/FFFFFF?text=LOGO" 
+                          src="${IMAGE_URL}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                      <!-- END Logo Placeholder: Replace the 'src' above with your ImageBB URL -->
@@ -815,7 +868,7 @@
             container.innerHTML = `
                 <!-- Logo Placeholder (Kept for continuity on this page) -->
                 <img id="app-logo-useless-page" 
-                     src="https://placehold.co/96x96/111111/FFFFFF?text=LOGO" 
+                     src="${IMAGE_URL}" 
                      alt="App Logo" 
                      class="w-24 h-24 mx-auto rounded-full border-4 border-white mb-8 object-cover">
 
@@ -836,18 +889,15 @@
         
         // Page Name: Useless Roast Result
         const renderUselessResult = (container, data) => {
+            // Updated to use passed data from processUselessName
             const enteredName = data && data.name ? data.name : "Unknown Entity";
-            // NOTE: Name lookup uses the exact casing provided by the user in the new FRIENDS array
-            const normalizedName = FRIENDS.find(f => f.toLowerCase() === enteredName.toLowerCase()) || 'default';
-            
-            // Look up the roast, defaulting if not found in the main friend list
-            const roastLine = NAME_ROASTS[normalizedName] || NAME_ROASTS['default'];
+            const roastLine = data && data.roast ? data.roast : "Error: Roast line missing.";
             
             container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
                 <!-- Logo Placeholder -->
                 <img id="app-logo-useless-result" 
-                     src="https://placehold.co/96x96/111111/FFFFFF?text=LOGO" 
+                     src="${IMAGE_URL}" 
                      alt="App Logo" 
                      class="w-24 h-24 mx-auto rounded-full border-4 border-white mb-8 object-cover">
                 
@@ -896,7 +946,7 @@
 
                      <!-- Logo Placeholder -->
                      <img id="app-logo-welcome" 
-                          src="https://placehold.co/96x96/111111/FFFFFF?text=LOGO" 
+                          src="${IMAGE_URL}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                      <!-- END Logo Placeholder: Replace the 'src' above with your ImageBB URL -->
@@ -998,7 +1048,7 @@
 
                      <!-- Logo Placeholder -->
                      <img id="app-logo-roaster" 
-                          src="https://placehold.co/96x96/111111/FFFFFF?text=LOGO" 
+                          src="${IMAGE_URL}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
 
@@ -1049,7 +1099,7 @@
 
                      <!-- Logo Placeholder -->
                      <img id="app-logo-inbox" 
-                          src="https://placehold.co/96x96/111111/FFFFFF?text=LOGO" 
+                          src="${IMAGE_URL}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                      <!-- END Logo Placeholder: Replace the 'src' above with your ImageBB URL -->
