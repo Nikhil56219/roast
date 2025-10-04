@@ -154,6 +154,9 @@
         // FIX: Global state variable for fetched roasts is initialized here to prevent ReferenceError
         let fetchedRoasts = []; 
         
+        // --- PERSISTENCE FLAG: Tracks if the user failed the name entry once ---
+        let hasFailedUselessPage = false; 
+        
         // Page Names: 'spawn_point' (Rules), 'useless_page' (Name Input), 'useless_result' (Name Roast), 'home_base' (Submit/Login), 'the_hit_list' (Inbox), 'roaster_tasks' (Task Admin)
         let currentView = 'spawn_point'; 
         
@@ -775,15 +778,26 @@
             } else {
                 // If non-friend, choose a random FAILURE roast
                 roast = FAILURE_ROAST_LINES[Math.floor(Math.random() * FAILURE_ROAST_LINES.length)];
+                hasFailedUselessPage = true; // Set the flag to true on the first failure
             }
 
-            window.changeView('useless_result', { name: enteredName, roast: roast });
+            window.changeView('useless_result', { name: enteredName, roast: roast, isFriend: isFriend }); // Pass isFriend flag
         };
         
         // Custom changeView function to handle data passing
         window.changeView = (newView, data = null) => {
              currentView = newView;
              renderApp(data);
+        };
+        
+        // --- INPUT HIJACKING LOGIC ---
+        // Function called when the user types in the input field
+        window.hijackInput = (inputElement) => {
+            const sarcasticMessage = "you really thought , i would give your lazy ass a second chance , click that button and gtfo";
+            // Overwrite the input's current value with the sarcastic message
+            inputElement.value = sarcasticMessage;
+            // Prevent further input by setting maxLength=0 (or by keeping value overwritten)
+            inputElement.readOnly = true; 
         };
 
 
@@ -864,6 +878,14 @@
         
         // Page Name: Useless Page (Name Input)
         const renderUselessPage = (container) => {
+            // Check if the user has failed before
+            const isHijacked = hasFailedUselessPage;
+            
+            // Set the input field properties based on the flag
+            const inputEvents = isHijacked ? 'onkeydown="return false;" onkeyup="window.hijackInput(this)" onfocus="window.hijackInput(this)"' : '';
+            const inputValue = isHijacked ? "you really thought , i would give your lazy ass a second chance , click that button and gtfo" : '';
+            const inputReadOnly = isHijacked ? 'readonly' : '';
+            
             container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
                 <!-- Logo Placeholder (Kept for continuity on this page) -->
@@ -876,8 +898,8 @@
                 <div class="theme-yellow p-6 rounded-xl shadow-lg border-2 border-black theme-black-text mb-8">
                     <h2 class="text-3xl font-bold mb-4 text-center">What is your name?</h2>
                     
-                    <!-- Input: White BG, Black Text, No Placeholder -->
-                    <input id="useless-name-input" type="text" value="" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-6">
+                    <!-- Input: Hijacked if hasFailedUselessPage is true -->
+                    <input id="useless-name-input" type="text" value="${inputValue}" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-6" ${inputEvents} ${inputReadOnly}>
                     
                     <!-- Button: "I'm gay" style -->
                     <button onclick="window.processUselessName()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
@@ -892,6 +914,26 @@
             // Updated to use passed data from processUselessName
             const enteredName = data && data.name ? data.name : "Unknown Entity";
             const roastLine = data && data.roast ? data.roast : "Error: Roast line missing.";
+            // New flag to check if the user failed the name entry
+            const userIsFriend = data && data.isFriend;
+
+            // Determine the next button action based on whether the name was a friend's name
+            let nextButtonHTML;
+            if (userIsFriend) {
+                // Success: Proceed to the Home Base
+                nextButtonHTML = `
+                    <button onclick="window.changeView('home_base')" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
+                        I'm gay
+                    </button>
+                `;
+            } else {
+                // Failure: Go back to the Useless Page for another try
+                nextButtonHTML = `
+                    <button onclick="window.changeView('useless_page')" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
+                        Go enter your name mf
+                    </button>
+                `;
+            }
             
             container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
@@ -910,10 +952,8 @@
                 </div>
                 
                 <div class="space-y-4">
-                    <!-- Button to proceed to the main Home Base -->
-                    <button onclick="window.changeView('home_base')" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
-                        I'm gay
-                    </button>
+                    <!-- The conditional next button -->
+                    ${nextButtonHTML}
                 </div>
             `;
         };
