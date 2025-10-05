@@ -150,14 +150,20 @@
         
         const initialAuthToken = null; // No custom token needed for public deployment, using anonymous sign-in
 
-        let app, db, auth, currentUserId = null, currentUserName = null;
-        // FIX: Global state variable for fetched roasts is initialized here to prevent ReferenceError
+        // FIX: Moved fetchedRoasts definition to the absolute top of the script
         let fetchedRoasts = []; 
+
+        let app, db, auth, currentUserId = null, currentUserName = null;
         
         // --- PERSISTENCE FLAG: Tracks if the user failed the name entry once ---
         let hasFailedUselessPage = false; 
         
-        // Page Names: 'spawn_point' (Rules), 'useless_page' (Name Input), 'useless_result' (Name Roast), 'home_base' (Submit/Login), 'the_hit_list' (Inbox), 'roaster_tasks' (Task Admin)
+        // --- SESSION DATA FOR REPLIES ---
+        let activeRoastData = null; // Used by reply_roast view
+        let replyTargetSession = null; // NEW: Used to store target when redirecting to Home Base
+
+        
+        // Page Names: 'spawn_point' (Rules), 'useless_page' (Name Input), 'useless_result' (Name Roast), 'home_base' (Submit/Login), 'the_hit_list' (Inbox), 'reply_roast' (New Page)
         let currentView = 'spawn_point'; 
         
         // UPDATED FRIEND NAMES (Original names used for display/login/target)
@@ -201,7 +207,7 @@
         
         const getTaskCollectionRef = () => {
              if (!db) return null;
-             // Public collection path for reveal tasks
+             // Public collection path for reveal tasks (RETAINED for database structure, but unused in non-anonymous mode)
              return collection(db, `artifacts/${appId}/public/data/reveal_tasks`);
         };
 
@@ -331,8 +337,11 @@
 
 
         const submitRoast = async (targetName, roastText, senderName) => {
+            // Find the active submit button based on ID for visual feedback
             const submitButton = document.querySelector('.sand-roast-button') || document.querySelector('#reply-roast-button');
-            const isReply = submitButton && submitButton.id === 'reply-roast-button';
+            
+            // Determine if this is a reply submission based on the session data
+            const isReply = currentView === 'reply_roast';
 
             if (!senderName || !targetName || !roastText) {
                 showMessage("Please select a sender, target, and write a roast.", true);
@@ -345,8 +354,10 @@
             }
 
             // Show sending animation
-            submitButton.disabled = true;
-            submitButton.innerHTML = `<div class="roast-sending-spinner w-6 h-6 border-4 rounded-full mx-auto"></div>`;
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = `<div class="roast-sending-spinner w-6 h-6 border-4 rounded-full mx-auto"></div>`;
+            }
 
             try {
                 // Simulate delay for animation visibility (1.5 seconds)
@@ -354,16 +365,18 @@
 
                 await addDoc(getRoastCollectionRef(), {
                     target: targetName,
-                    senderName: senderName, // Stored for the reveal/guess
+                    senderName: senderName, // Stored for visibility
                     roastText: roastText,
                     isRead: false, 
-                    isRevealed: false, // New flag for reveal status
+                    isRevealed: true, // NON-ANONYMOUS MODE: Always true
                     createdAt: new Date()
                 });
                 
-                // If this was a reply, close the modal; otherwise, show the main success modal
+                // --- Post Submission Flow ---
                 if (isReply) {
-                    window.closeModal();
+                    // If it was a reply, clear session and go back to the Hit List
+                    activeRoastData = null; 
+                    window.changeView('the_hit_list');
                     showMessage("Retaliation sand successfully!", false);
                 } else {
                     // This is the main submission flow
@@ -378,9 +391,11 @@
                 console.error("Error submitting roast:", error);
                 showMessage("Failed to submit roast. Check console for details.", true);
             } finally {
-                // Reset button regardless of success/failure
-                submitButton.disabled = false;
-                submitButton.textContent = isReply ? "Sand Reply Roast" : "Sand roast";
+                 if (submitButton) {
+                    // Reset button regardless of success/failure
+                    submitButton.disabled = false;
+                    submitButton.textContent = isReply ? "Sand Reply Roast" : "Sand roast";
+                }
             }
         };
 
@@ -423,22 +438,22 @@
                      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                      const dateTimeStr = `${dateStr} ${timeStr}`;
 
-                     // Determine if the message has been revealed to change the title appearance
-                     const titleText = roast.isRevealed ? roast.senderName : '***';
+                     // ANONYMOUS MODE FOR DISPLAY: Use *** for the title
+                     const titleText = '***'; 
 
                      return `
                      <!-- Message Card: Clicking reveals the detail modal -->
-                     <div class="p-4 mb-3 rounded-lg border-2 border-black cursor-pointer ${roast.isRevealed ? 'theme-yellow opacity-75' : 'theme-white-bg'}" 
+                     <div class="p-4 mb-3 rounded-lg border-2 border-black cursor-pointer ${roast.isRead ? 'theme-yellow opacity-75' : 'theme-white-bg'}" 
                           onclick="showRoastDetailModal(${index})">
                          <div class="flex justify-between items-start mb-2">
-                             <!-- Sender/Anonymity Title -->
+                             <!-- Sender Name (NOW VISIBLE) -->
                              <span class="font-extrabold text-lg theme-black-text">${titleText}</span>
                              <!-- Date/Time Display -->
                              <span class="text-xs theme-black-text">${dateTimeStr}</span>
                          </div>
                          <!-- Roast Text Preview -->
                          <p class="font-medium text-base theme-black-text">${roast.roastText.substring(0, 50)}${roast.roastText.length > 50 ? '...' : ''}</p>
-                         <p class="text-right text-xs mt-2 theme-black-text italic">${roast.isRevealed ? '— Revealed' : (roast.isRead ? '— Read' : '— New')}</p>
+                         <p class="text-right text-xs mt-2 theme-black-text italic">${roast.isRead ? '— Read' : '— New'}</p>
                      </div>
                  `;
                  }).join('');
@@ -465,39 +480,31 @@
              }
          };
 
-        // Renders the reply form inside the modal
-        window.renderReplyRoastForm = (roast) => {
-            const modalContent = document.getElementById('roast-detail-content');
+        // New function to redirect to the reply page and set session data
+        window.startAnonymousReply = (roast) => {
+            // FIX: Use URL hash instead of history.replaceState to prevent SecurityError in iframes/local files.
             
-            // Note: The roast sender is still anonymous to the user, but we know it for targeting the reply
-            const targetSender = roast.senderName; 
-            const replyingAs = roast.target; // The person being roasted is the sender of the reply
+            const senderNameEncoded = encodeURIComponent(roast.senderName);
             
-            modalContent.innerHTML = `
-                <h2 class="text-3xl font-extrabold mb-4 theme-black-text">REVENGE ROAST!</h2>
-                <p class="text-lg font-semibold mb-4 theme-black-text">Sand an anonymous reply back to the coward who sent this.</p>
-                
-                <div class="mb-6">
-                    <label for="reply-roast-text" class="block text-xl font-extrabold theme-black-text mb-2">Write like you’ll deny it in court later :</label>
-                    <textarea id="reply-roast-text" rows="4" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black" placeholder=""></textarea> 
-                </div>
-
-                <button id="reply-roast-button" onclick="handleReplyRoastSubmission('${targetSender}', '${replyingAs}')" 
-                        class="w-full font-extrabold text-xl py-3 rounded-lg shadow-md transition duration-300 sand-roast-button mb-4">
-                    Sand Reply Roast
-                </button>
-                
-                <button onclick="window.closeModal()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
-                    Close
-                </button>
-            `;
+            // Navigate to Home Base and pass the target via the URL hash
+            window.location.hash = `#view=home_base&replyTarget=${senderNameEncoded}`;
         };
 
-        // Wrapper function to handle reply submission
-        const handleReplyRoastSubmission = (targetSender, replyingAs) => {
+        // Renders the reply form inside the modal (This is now redundant but kept for clarity if we needed the modal view)
+        window.renderReplyRoastForm = (roast) => {
+            // We use the new dedicated page now, so this is just here to prevent errors if older code calls it
+            window.startAnonymousReply(roast);
+        };
+
+        // Wrapper function to handle reply submission from the dedicated page
+        const handleReplyRoastSubmission = () => {
+            if (!activeRoastData) {
+                showMessage("Error: Cannot find target for revenge roast.", true);
+                return;
+            }
             const roastText = document.getElementById('reply-roast-text').value.trim();
-            // In a reply: target is the original sender, sender is the current user
-            submitRoast(targetSender, roastText, replyingAs);
+            // In a reply: target is the original sender, sender is the current user (from activeRoastData)
+            submitRoast(activeRoastData.target, roastText, activeRoastData.replyingAs);
         };
          
          // Function to show the roast detail and the task/reveal status
@@ -512,236 +519,68 @@
              
              const modalRoot = document.getElementById('modal-root');
              
-             // Check task status
-             let taskStatus = await getTaskStatus(roast.id);
-             
-             // Generate Modal Content based on task status
-             const getTaskUI = (roast, taskStatus) => {
-                 // --- Reveal Status Check ---
-                 if (roast.isRevealed) {
-                     return `
-                         <p class="text-3xl font-extrabold text-red-500 mb-4">IDENTIY REVEALED!</p>
-                         <p class="text-xl font-semibold mb-4 theme-black-text">It was the coward: **${roast.senderName}**</p>
-                     `;
-                 }
-                 
-                 // --- Task Status UI ---
-                 let revealButtonHTML = '';
-                 let taskInputHTML = '';
-                 
-                 if (!taskStatus) { // No request sent yet (task_pending)
-                     revealButtonHTML = `
-                         <button id="reveal-button" 
-                                 onclick="requestRoasterReveal('${roast.id}', '${roast.target}', '${roast.senderName}')" 
-                                 class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 login-button mb-4">
-                             Want to know who sand this?
-                         </button>
-                     `;
-                 } else if (taskStatus.status === 'task_pending') { // Task requested, Roaster hasn't responded
-                     revealButtonHTML = `<button disabled class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 login-button opacity-50 mb-4">
-                         Task request is sent to roaster, wait for the task...
-                     </button>`;
-                 } else if (taskStatus.status === 'task_given') { // Task assigned, waiting for code entry
-                     revealButtonHTML = `<p class="text-lg font-bold text-red-500 mb-2">TASK: ${taskStatus.taskDescription}</p>`;
-                     taskInputHTML = `
-                         <input id="task-code-input" type="text" placeholder="Enter Task Code (e.g., A1B2C3)" class="w-full p-3 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black text-center text-2xl font-bold mb-4">
-                         <button onclick="submitTaskCode('${roast.id}')" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 login-button mb-4">
-                             I'm gay (Submit Code)
-                         </button>
-                     `;
-                 } else if (taskStatus.status === 'task_completed') {
-                      revealButtonHTML = `<p class="text-xl font-bold text-green-500 mb-4">TASK COMPLETED. Revealing Identity...</p>`;
-                      // This state means the roast.isRevealed should be true, handled by the first if block
-                 }
-
-                 return `
-                     <!-- Roast Text in Yellow Box -->
-                     <p class="text-xl font-medium mb-4 p-4 theme-yellow rounded-lg italic theme-black-text text-left">${roast.roastText}</p>
-                     
-                     <!-- Buttons for Roast Back and Reveal/Close -->
-                     <div class="grid grid-cols-3 gap-2 mb-4">
-                         <button onclick="window.renderReplyRoastForm(fetchedRoasts[${index}])" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 roast-back-button">
-                             Roast them back
-                         </button>
-                         <button onclick="window.closeModal()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
-                             Close
-                         </button>
-                         ${revealButtonHTML}
-                     </div>
-
-                     ${taskInputHTML}
-                     
-                 `;
-             };
-
+             // NON-ANONYMOUS MODE: No identity reveal logic needed here.
 
              modalRoot.innerHTML = `
                  <div class="modal-overlay" onclick="closeModal()">
-                     <div id="roast-detail-container" class="theme-white-bg p-8 rounded-xl shadow-2xl border-4 border-black text-center max-w-lg theme-black-text" onclick="event.stopPropagation()">
+                     <!-- MODAL CONTAINER: Changed to BLACK background -->
+                     <div id="roast-detail-container" class="theme-black-bg p-8 rounded-xl shadow-2xl border-4 border-white text-center max-w-lg theme-white-text" onclick="event.stopPropagation()">
                          <h2 class="text-3xl font-extrabold mb-4">YOU'VE BEEN ROASTED!</h2>
-                         <div id="roast-detail-content">
-                            ${getTaskUI(roast, taskStatus)}
-                         </div>
                          
+                         <div id="roast-detail-content">
+                             <!-- Roast Text in Yellow Box -->
+                             <p class="text-xl font-medium mb-4 p-4 theme-yellow rounded-lg italic theme-black-text text-left">${roast.roastText}</p>
+                             
+                             <!-- Removed SENT BY: Identity is already known from the inbox preview -->
+
+                             <!-- Buttons for Roast Back and Close -->
+                             <div class="grid grid-cols-2 gap-4 mb-4">
+                                 <!-- FIX: Pass the roast object to ensure we get the senderName -->
+                                 <button onclick="window.startAnonymousReply(fetchedRoasts[${index}])" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 roast-back-button">
+                                     Roast them back
+                                 </button>
+                                 <button onclick="window.closeModal()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
+                                     Close
+                                 </button>
+                             </div>
+                         </div>
                      </div>
                  </div>
              `;
          };
          
-         // Helper function to get the current task status for a roast
+         // Helper function to get the current task status for a roast (REMOVED: Task logic is obsolete)
          const getTaskStatus = async (roastId) => {
-             if (!db) return null;
-             try {
-                 const q = query(getTaskCollectionRef(), where("roastId", "==", roastId));
-                 const snapshot = await getDocs(q);
-                 if (!snapshot.empty) {
-                     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                 }
-                 return null;
-             } catch (error) {
-                 console.error("Error fetching task status:", error);
-                 return null;
-             }
-         };
-
-         // 1. ROASTED USER: Requests the task (triggers task creation)
-         window.requestRoasterReveal = async (roastId, targetName, senderName) => {
-             const revealButton = document.getElementById('reveal-button');
-             revealButton.textContent = "Task request is sent to roaster, wait for the task...";
-             revealButton.disabled = true;
-             revealButton.classList.remove('login-button');
-             revealButton.classList.add('gay-button', 'opacity-50');
-
-             try {
-                 await addDoc(getTaskCollectionRef(), {
-                     roastId: roastId,
-                     targetName: targetName, // Person who got roasted
-                     senderName: senderName, // Person who sent the roast (will assign task)
-                     status: 'task_pending',
-                     createdAt: new Date(),
-                     taskCode: null,
-                     taskDescription: null,
-                 });
-                 // Keep the modal open to show the user the status has updated
-             } catch (error) {
-                 showMessage("Failed to send reveal request.", true);
-                 console.error(error);
-             }
+             // Function is kept as a stub to avoid errors in simplified code, but always returns null
+             return null;
          };
          
-         // 2. ROASTED USER: Submits the task code
-         window.submitTaskCode = async (roastId) => {
-             const code = document.getElementById('task-code-input').value.trim().toUpperCase();
-             if (code.length === 0) {
-                 showMessage("Enter the task code, you chicken.", true);
-                 return;
-             }
-
-             const taskStatus = await getTaskStatus(roastId);
-             if (!taskStatus) {
-                 showMessage("No task found for this roast.", true);
-                 return;
-             }
-             
-             if (taskStatus.taskCode === code) {
-                 // Correct code! Reveal identity and mark both roast and task complete.
-                 await updateDoc(doc(getRoastCollectionRef(), roastId), { isRevealed: true });
-                 await updateDoc(doc(getTaskCollectionRef(), taskStatus.id), { status: 'task_completed' });
-                 
-                 showMessage(`Identity revealed! The coward was ${taskStatus.senderName}!`, false);
-                 closeModal();
-                 // Re-render the detail modal to show the revealed name immediately
-                 getRoastsForInbox();
-             } else {
-                 showMessage("Wrong code. You didn't complete the task, failure.", true);
-             }
+         // 1. ROASTED USER: Requests the task (REMOVED: Task logic is obsolete)
+         window.requestRoasterReveal = (roastId, targetName, senderName) => {
+             showMessage("Anonymous reveal system is deactivated. Sender identity is always visible.", false);
          };
          
-         // 3. ROASTER: Generates the task code (from Roaster Tasks Dashboard)
-         window.generateTask = async (taskDocId, roastId, senderName) => {
-             const taskInput = document.getElementById(`task-input-${taskDocId}`).value.trim();
-             if (taskInput.length === 0) {
-                 showMessage("You must assign a task!", true);
-                 return;
-             }
-             
-             const taskCode = generateTaskCode();
-             
-             try {
-                 await updateDoc(doc(getTaskCollectionRef(), taskDocId), {
-                     status: 'task_given',
-                     taskDescription: taskInput,
-                     taskCode: taskCode,
-                 });
-                 
-                 showMessage(`Task assigned and code generated: ${taskCode}`, false);
-                 // Re-render the list immediately
-                 window.getRoasterTasks(); 
-             } catch (error) {
-                 showMessage("Failed to assign task.", true);
-                 console.error(error);
-             }
+         // 2. ROASTED USER: Submits the task code (REMOVED: Task logic is obsolete)
+         window.submitTaskCode = (roastId) => {
+             showMessage("Task submission is obsolete.", true);
          };
          
-         // Function to fetch tasks assigned TO the current user (if current user is the roaster/sender)
+         // 3. ROASTER: Generates the task code (REMOVED: Task logic is obsolete)
+         window.generateTask = (taskDocId, roastId, senderName) => {
+             showMessage("Task generation is obsolete.", true);
+         };
+         
+         // Function to fetch tasks assigned TO the current user (REMOVED: Task logic is obsolete)
          window.getRoasterTasks = async () => {
-             if (!db || !currentUserName) return;
-             
              const taskContainer = document.getElementById('roaster-task-list');
-             taskContainer.innerHTML = `<p class="theme-black-text">Fetching tasks you need to assign...</p>`;
-
-             try {
-                 // Fetch tasks where the current user is the sender (roaster) and the task hasn't been completed
-                 const q = query(getTaskCollectionRef(), 
-                                 where("senderName", "==", currentUserName), 
-                                 where("status", "!=", "task_completed"));
-                 const snapshot = await getDocs(q);
-
-                 if (snapshot.empty) {
-                     taskContainer.innerHTML = `<p class="theme-black-text">Your hands are clean (for now).</p>`;
-                     return;
-                 }
-                 
-                 const taskListHTML = snapshot.docs.map(doc => {
-                     const task = { id: doc.id, ...doc.data() };
-                     
-                     let taskUI;
-                     if (task.status === 'task_pending') {
-                         // Pending assignment: Show input fields
-                         taskUI = `
-                             <input id="task-input-${task.id}" type="text" placeholder="e.g., Send a silly face selfie to the group chat" class="w-full p-2 border-2 border-black rounded-lg theme-white-bg theme-black-text focus:ring-black focus:border-black mb-3">
-                             <button onclick="window.generateTask('${task.id}', '${task.roastId}', '${task.senderName}')" class="w-full font-extrabold py-2 rounded-lg shadow-md transition duration-300 login-button">
-                                 Assign Task & Generate Code
-                             </button>
-                         `;
-                     } else if (task.status === 'task_given') {
-                         // Task assigned: Show task and code
-                         taskUI = `
-                             <p class="font-bold text-lg">TASK: <span class="text-red-500">${task.taskDescription}</span></p>
-                             <p class="font-bold text-xl mt-2">CODE: <span class="theme-yellow theme-black-text p-1 rounded">${task.taskCode}</span></p>
-                             <p class="text-sm mt-1 text-gray-700">Waiting for ${task.targetName} to submit this code...</p>
-                         `;
-                     }
-                     
-                     return `
-                         <div class="p-4 mb-4 rounded-lg border-2 border-black theme-yellow">
-                             <h3 class="font-bold text-xl theme-black-text mb-2">🔥 Reveal Request from ${task.targetName}</h3>
-                             <p class="text-sm theme-black-text mb-3">Roast ID: ${task.roastId.substring(0, 8)}...</p>
-                             ${taskUI}
-                         </div>
-                     `;
-                 }).join('');
-
-                 taskContainer.innerHTML = `<div class="max-h-96 overflow-y-scroll p-2">${taskListHTML}</div>`;
-
-             } catch (error) {
-                 console.error("Error fetching roaster tasks:", error);
-                 taskContainer.innerHTML = `<p class="theme-black-text text-red-500">Error fetching your tasks.</p>`;
+             if (taskContainer) {
+                 taskContainer.innerHTML = `<p class="theme-black-text">Task system is currently disabled (Non-Anonymous Mode).</p>`;
              }
          };
          
+         // Navigation functions are kept
          window.goToRoasterTasks = () => {
-             window.changeView('roaster_tasks');
+             showMessage("Roaster Admin is disabled because anonymity is turned off.", true);
          };
          
          window.goToInbox = () => {
@@ -793,6 +632,12 @@
         // Custom changeView function to handle data passing
         window.changeView = (newView, data = null) => {
              currentView = newView;
+             
+             // If we're changing to a clean view, clear the URL hash (like logging out)
+             if (currentView !== 'home_base') {
+                 window.location.hash = ''; // Clear hash for non-home-base views
+             }
+
              renderApp(data);
         };
         
@@ -807,6 +652,14 @@
                 // Lock the field after the message is displayed
                 inputElement.readOnly = true; 
             }
+        };
+
+        // --- URL Parameter Utility ---
+        const getUrlParameter = (name) => {
+            // Get parameter from URL hash (e.g., #view=home_base&replyTarget=Nikhil)
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            return params.get(name);
         };
 
 
@@ -827,11 +680,30 @@
         window.generateTask = generateTask;
         window.submitTaskCode = submitTaskCode;
         window.getRoasterTasks = getRoasterTasks;
+        window.startAnonymousReply = startAnonymousReply; // FIX: Ensure this is correctly exposed
+
 
         // --- View Rendering ---
 
         const renderApp = (data = null) => {
             const appContainer = document.getElementById('app-container');
+            
+            // Check URL hash for reply parameters BEFORE rendering the view
+            const urlTarget = getUrlParameter('replyTarget');
+            const urlView = getUrlParameter('view');
+            
+            // Priority check: If URL hash indicates home_base, override currentView
+            if (urlView === 'home_base' && urlTarget) {
+                currentView = 'home_base';
+                replyTargetSession = decodeURIComponent(urlTarget); // Set session variable from URL
+                
+                // Clear the URL hash immediately after reading it to prevent loop/data confusion on refresh
+                window.location.hash = ''; 
+            } else {
+                 replyTargetSession = null; // Clear session if not coming from a reply link
+            }
+            
+            
             if (currentView === 'spawn_point') {
                 renderRulesScreen(appContainer);
             } else if (currentView === 'useless_page') {
@@ -842,14 +714,27 @@
                 // If not logged in and past rules, show submit/login screen (Home Base)
                 renderWelcomeScreen(appContainer); 
             } else if (currentView === 'roaster_tasks') {
-                 // New Roaster Task View
-                 renderRoasterTaskInterface(appContainer);
+                 // Removed ROASTER_TASKS view for non-anonymous mode
+                 showMessage("Roaster Admin is disabled because anonymity is turned off.", true);
+                 window.changeView('the_hit_list');
+            } else if (currentView === 'reply_roast') {
+                // NEW: Dedicated Reply Roast Page
+                renderReplyRoastPage(appContainer);
             } else {
                 // If logged in, always render the main inbox interface (The Hit List)
                 renderMainInterface(appContainer);
             }
         };
-
+        
+        // --- NEW PAGE: Dedicated Anonymous Reply Screen (REMOVED, Logic is now handled by Home Base) ---
+        // This function is kept as a stub to prevent errors if older code calls it
+        const renderReplyRoastPage = (container) => {
+            showMessage("Redirecting to Home Base for reply...", false);
+            window.changeView('home_base');
+        };
+        // End NEW PAGE: Dedicated Anonymous Reply Screen
+        
+        
         // Page Name: Spawn Point (Rules)
         const renderRulesScreen = (container) => {
              container.className = 'w-full max-w-xl theme-black-bg p-8 rounded-xl border-white-thin';
@@ -998,6 +883,20 @@
              `).join('');
 
              const optionList = allFriends.map(name => `<option value="${name}">${name}</option>`).join('');
+             
+             // Determine if this is a reply redirect and set selected values
+             let selectedSender = currentUserName || '';
+             let selectedTarget = '';
+             let replyMessage = '';
+             
+             // Check URL for reply target
+             const urlTarget = getUrlParameter('replyTarget');
+
+             if (urlTarget) {
+                 selectedTarget = urlTarget;
+                 replyMessage = `<p class="theme-black-text mb-3 font-semibold text-lg">Targeting the sender of the last roast you read: **${selectedTarget}**</p>`;
+             }
+
 
              container.innerHTML = `
                 <!-- Header / Title Card: Yellow BG, Black Text, Black Border -->
@@ -1021,6 +920,8 @@
                  <div class="theme-yellow p-6 rounded-xl shadow-lg border-2 border-black mb-6">
                      <h2 class="text-3xl font-bold theme-black-text mb-4">Fuck someone anonymously</h2>
                      
+                     ${replyMessage}
+
                      <!-- Sender Dropdown -->
                      <div class="mb-4">
                          <!-- UPDATED FONT SIZE AND BOLDNESS: text-xl font-extrabold -->
@@ -1063,6 +964,19 @@
                      </div>
                  </div>
              `;
+             
+             // --- POST-RENDER SCRIPT ---
+             // Set pre-selected values if redirected for a reply
+             const senderSelect = document.getElementById('roast-sender-select');
+             const targetSelect = document.getElementById('roast-target');
+             
+             if (currentUserName && senderSelect) {
+                 senderSelect.value = currentUserName;
+             }
+             if (selectedTarget && targetSelect) {
+                 targetSelect.value = selectedTarget;
+             }
+
         };
 
         // Page Name: The Hit List (Inbox)
@@ -1085,63 +999,9 @@
         
         // New: Roaster Task Management Interface
         const renderRoasterTaskInterface = (container) => {
-             // Main App Container: Black BG, White Border
-             container.className = 'w-full max-w-4xl theme-black-bg p-4 rounded-xl border-white-thin';
-             
-             // Content for the Roaster's Dashboard
-             let contentHTML = `
-                 <!-- Task Card: Yellow BG, Black Text, Black Border -->
-                 <div class="theme-yellow p-6 rounded-xl shadow-lg border-2 border-black theme-black-text">
-                     <h2 class="text-3xl font-bold theme-black-text mb-4">Task Assignment Dashboard</h2>
-                     <p class="mb-4">You have reveal requests pending. Assign a silly task to the user below to reveal your identity!</p>
-                     
-                     <div id="roaster-task-list" class="mt-4 p-4 theme-white-bg rounded-lg border-2 border-black">
-                        <p class="theme-black-text">Loading tasks...</p>
-                     </div>
-                 </div>
-             `;
-
-             container.innerHTML = `
-                 <!-- Header / Title Card: Yellow BG, Black Text, Black Border -->
-                 <div class="text-center mb-8 p-6 theme-yellow rounded-xl shadow-2xl border-4 border-black relative">
-                     <!-- New button: Go Back To Spawn Point (Goes to the rules screen) -->
-                     <button onclick="window.goToSpawnPoint()" class="absolute top-3 left-3 theme-black-bg theme-white-text font-semibold py-1 px-3 rounded-lg transition duration-200 border-2 border-white text-sm gay-button">
-                         Go Back To Spawn Point
-                     </button>
-
-                     <!-- Logo Placeholder -->
-                     <img id="app-logo-roaster" 
-                          src="${IMAGE_URL}" 
-                          alt="App Logo" 
-                          class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
-
-                     <h1 class="text-5xl font-extrabold theme-black-text">ROASTER ADMIN</h1>
-                     <p class="text-lg font-semibold mt-2 theme-black-text">Logged in as: **${currentUserName}**</p>
-                     <p class="text-xs mt-2 theme-black-text">User ID: ${currentUserId}</p>
-                 </div>
-
-                 <!-- Navigation (Back to Inbox) -->
-                 <div class="mb-6 flex justify-between">
-                     <!-- Back to Inbox -->
-                     <button onclick="window.goToInbox()" class="font-semibold py-2 px-4 rounded-lg transition duration-200 gay-button">
-                         ← Back to Inbox
-                     </button>
-                     <!-- Log Out -->
-                      <button onclick="window.logOut()" class="font-semibold py-2 px-4 rounded-lg transition duration-200 gay-button">
-                         GO BACK
-                     </button>
-                 </div>
-
-                 <!-- Main Content -->
-                 <div id="main-content-area">
-                     ${contentHTML}
-                 </div>
-
-                 <!-- Message Container for Feedback -->
-                 <div id="message-container" class="fixed bottom-0 right-0 m-6"></div>
-             `;
-             // Initiate fetching tasks upon rendering this view
-             window.getRoasterTasks();
+             // Redirection for non-anonymous mode
+             showMessage("Roaster Admin is disabled because anonymity is turned off.", true);
+             window.changeView('the_hit_list');
         };
 
 
@@ -1179,9 +1039,9 @@
                      <button onclick="window.logOut()" class="font-semibold py-2 px-4 rounded-lg transition duration-200 gay-button">
                          GO BACK
                      </button>
-                     <!-- Roaster Admin Button -->
-                     <button onclick="window.goToRoasterTasks()" class="font-semibold py-2 px-4 rounded-lg transition duration-200 login-button">
-                         ROASTER ADMIN
+                     <!-- Roaster Admin is disabled, redirecting to home base -->
+                     <button onclick="window.changeView('home_base')" class="font-semibold py-2 px-4 rounded-lg transition duration-200 login-button opacity-50">
+                         ROASTER ADMIN (Disabled)
                      </button>
                  </div>
 
