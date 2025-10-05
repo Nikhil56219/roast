@@ -161,7 +161,8 @@
         let currentView = 'spawn_point'; 
         
         // UPDATED FRIEND NAMES (Original names used for display/login/target)
-        const FRIENDS = ['Nikhil', 'Sahiti', 'Shanmukh', 'Usmani'];
+        // CHANGED ORDER TO: Shanmukh, Sahiti, Nikhil, Usmani
+        const FRIENDS = ['Shanmukh', 'Sahiti', 'Nikhil', 'Usmani'];
         
         // List of all possible random roasts for the Useless Page (If friend name entered)
         const FRIEND_ROAST_LINES = [
@@ -565,13 +566,11 @@
                          <button onclick="window.closeModal()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
                              Close
                          </button>
-                         <button onclick="window.requestRoasterReveal('${roast.id}', '${roast.target}', '${roast.senderName}')" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 login-button">
-                             Want to know who sand this?
-                         </button>
+                         ${revealButtonHTML}
                      </div>
 
                      ${taskInputHTML}
-                     ${revealButtonHTML}
+                     
                  `;
              };
 
@@ -875,7 +874,11 @@
                          <li><span class="font-extrabold">Rule 3:</span> Time to pay attention, even if you can't try to.... Always smile at the shadows dancing across your ceiling, even if the floor starts humming your secrets to the walls, while someone unseen rearranges the air around your thoughts, judging your every hesitation quietly...........Doesn't make sense? just like your productivity</li>
                          <li><span class="font-extrabold">Rule 4:</span> You’re still reading? Wow, dedication to wasting time, impressive as always.</li>
                      </ol>
-                     <p class="mt-6 text-center text-sm italic font-semibold">By continuing, you agree to look like a proper idiot and contribute to the chaos.</p>
+                     <!-- NEW BOLD ANONYMITY TEXT -->
+                     <p class="mt-6 text-center text-base font-extrabold theme-black-text">
+                        Remember everything is anonymous
+                     </p>
+                     <p class="mt-2 text-center text-sm italic font-semibold">By continuing, you agree to be insulted, offended, and insult others.</p>
                  </div>
                  
                  <div class="space-y-4">
@@ -984,7 +987,10 @@
              // All friends are potential senders and targets
              const allFriends = FRIENDS; 
              
-             const friendsList = allFriends.map(name => `
+             // Create friend buttons in the specified order: Shanmukh, Sahiti, Nikhil, Usmani
+             const friendsList = [
+                 'Shanmukh', 'Sahiti', 'Nikhil', 'Usmani'
+             ].map(name => `
                 <!-- Login Button: Uses the new login-button style (Yellow BG, Name Text) -->
                 <button onclick="window.setUserName('${name}')" class="font-bold py-3 px-4 rounded-lg transition duration-200 login-button">
                     ${name} 
