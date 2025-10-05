@@ -781,6 +781,7 @@
             if (isFriend) {
                 // If friend, choose a random FRIEND roast
                 roast = FRIEND_ROAST_LINES[Math.floor(Math.random() * FRIEND_ROAST_LINES.length)];
+                hasFailedUselessPage = false; // Reset failure flag on success
             } else {
                 // If non-friend, choose a random FAILURE roast
                 roast = FAILURE_ROAST_LINES[Math.floor(Math.random() * FAILURE_ROAST_LINES.length)];
@@ -869,17 +870,18 @@
                  <!-- Rules Card: White BG, Black Text, Black Border -->
                  <div class="theme-white-bg p-6 rounded-xl shadow-lg border-2 border-black theme-black-text mb-8">
                      <ol class="list-decimal list-inside space-y-3 font-medium">
-                         <li><span class="font-extrabold">Rule 1: Thou Shalt Not Be Appropriate.</span> We strictly enforce the opposite of respect. If your roast isn't highly questionable, delete it and start over.</li>
-                         <li><span class="font-extrabold">Rule 2: Anonymity is Cowardice.</span> The roast sender is hidden, but the goal is to *unmask* them. If you guess wrong, the resulting shame is entirely your burden.</li>
-                         <li><span class="font-extrabold">Rule 3: Retaliation is Mandatory.</span> If you receive a roast, you must send one back immediately. Failure to participate earns you the title of **Certified Wet Sock** of the friend group.</li>
+                         <li><span class="font-extrabold">Rule 1:</span> Users are expected to be appropriate and respectful; but if you are, congratulations — you failed the first rule.</li>
+                         <li><span class="font-extrabold">Rule 2:</span> Crying is allowed, pictures of you crying are encouraged.</li>
+                         <li><span class="font-extrabold">Rule 3:</span> Time to pay attention, even if you can't try to.... Always smile at the shadows dancing across your ceiling, even if the floor starts humming your secrets to the walls, while someone unseen rearranges the air around your thoughts, judging your every hesitation quietly...........Doesn't make sense? just like your productivity</li>
+                         <li><span class="font-extrabold">Rule 4:</span> You’re still reading? Wow, dedication to wasting time, impressive as always.</li>
                      </ol>
                      <p class="mt-6 text-center text-sm italic font-semibold">By continuing, you agree to look like a proper idiot and contribute to the chaos.</p>
                  </div>
                  
                  <div class="space-y-4">
-                     <!-- Button to proceed -->
+                     <!-- Button to proceed - CUSTOM TEXT ON THIS PAGE ONLY -->
                      <button onclick="window.acceptRules()" class="w-full text-xl py-4 rounded-lg shadow-md transition duration-300 gay-button">
-                         I'm gay
+                         by clicking this button i agree that im gay
                      </button>
                  </div>
              `;
