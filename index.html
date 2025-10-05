@@ -1096,9 +1096,6 @@
     <div id="modal-root"></div>
     
    
-<!-- Message Container for Feedback -->
-<div id="message-container" class="fixed bottom-0 right-0 m-6"></div>
-
 <!-- App Loading / Main Container -->
 <div id="app-container"
      class="w-full max-w-lg theme-black-bg p-0 rounded-xl border-white-thin overflow-hidden relative min-h-[60vh] flex items-center justify-center">
@@ -1107,7 +1104,21 @@
   <img src="https://i.ibb.co/VcsdcBjK/Whats-App-Image-2025-10-03-at-19-51-48-f314b63e.jpg" alt="Loading..."
        class="absolute inset-0 w-full h-full object-cover">
 
-  <!-- Optional overlay text (you can delete this if you want just the image) -->
+  <!-- Loading spinner -->
+  <div class="absolute z-20 flex items-center justify-center">
+    <svg class="animate-spin h-10 w-10 text-white"
+         xmlns="http://www.w3.org/2000/svg"
+         fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10"
+              stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 
+               5.291A7.962 7.962 0 004 12H0c0 3.042 
+               1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  </div>
+
+  <!-- Optional overlay text -->
   <div class="relative z-10 bg-black/50 w-full text-center py-6">
     <h1 class="text-2xl font-extrabold text-white">ahgu load avvutundhi</h1>
     <p class="text-white opacity-80"></p>
