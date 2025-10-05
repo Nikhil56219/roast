@@ -137,7 +137,19 @@
         setLogLevel('Debug');
 
         // --- GLOBAL CONSTANTS ---
-        const IMAGE_URL = "https://i.ibb.co/27Rt9p5d/Whats-App-Image-2025-10-03-at-19-52-49-ce9f69b5.jpg";
+        // Base Logo URL (Default Logo)
+        const BASE_IMAGE_URL = "https://i.ibb.co/27Rt9p5d/Whats-App-Image-2025-10-03-at-19-52-49-ce9f69b5.jpg";
+        
+        // Custom URLs for friends - YOU WILL REPLACE THESE PLACEHOLDERS
+        const CUSTOM_LOGOS = {
+            // FIX: Use uppercase keys for consistent lookup in getDynamicLogoUrl
+            'NIKHIL': "https://placehold.co/96x96/FFD500/111111?text=NIKHIL",
+            'SHANMUKH': "https://i.ibb.co/7xPBkktS/Whats-App-Image-2025-10-05-at-12-27-16-fc6f2249.jpg",
+             Add Sahiti and Usmani logos here when ready:
+            'SAHITI': "https://i.ibb.co/ynftQ02D/Whats-App-Image-2025-10-05-at-12-25-00-25ad8b92.jpg",
+             'USMANI': "https://i.ibb.co/pj32wsZC/Whats-App-Image-2025-10-05-at-12-28-41-e6f3e837.jpg",
+        };
+
         const appId = 'roast-station-app'; // Hardcoded unique identifier for your app's data path
         
         // ***************************************************************
@@ -199,6 +211,18 @@
 
 
         // --- Utility Functions ---
+        // NEW FUNCTION: Dynamically choose logo based on current user or default
+        const getDynamicLogoUrl = () => {
+             // Check if user is logged in AND has a custom logo defined (using uppercase for case-insensitive check)
+             const upperName = currentUserName ? currentUserName.toUpperCase() : '';
+             if (upperName && CUSTOM_LOGOS[upperName]) {
+                 return CUSTOM_LOGOS[upperName];
+             }
+             // Otherwise, return the main app logo
+             return BASE_IMAGE_URL;
+        };
+
+
         const getRoastCollectionRef = () => {
             if (!db) return null;
             // Public collection path: /artifacts/{appId}/public/data/roasts
@@ -319,7 +343,7 @@
                     <div class="theme-yellow p-8 rounded-xl shadow-2xl border-4 border-black text-center max-w-sm" onclick="event.stopPropagation()">
                         
                         <!-- Logo Placeholder in Modal -->
-                        <img src="${IMAGE_URL}" 
+                        <img src="${getDynamicLogoUrl()}" 
                              alt="Modal Logo" 
                              class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                         
@@ -613,6 +637,7 @@
             }
 
             // --- Case-Insensitive Check ---
+            // FIX: Ensure comparison is case-insensitive
             const isFriend = FRIENDS.some(f => f.toLowerCase() === enteredName.toLowerCase());
 
             let roast;
@@ -743,7 +768,7 @@
                  <div class="text-center mb-8 p-6 theme-yellow rounded-xl shadow-2xl border-4 border-black">
                      <!-- Logo Placeholder -->
                      <img id="app-logo-rules" 
-                          src="${IMAGE_URL}" 
+                          src="${getDynamicLogoUrl()}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                      <!-- END Logo Placeholder: Replace the 'src' above with your ImageBB URL -->
@@ -794,7 +819,7 @@
             container.innerHTML = `
                 <!-- Logo Placeholder (Kept for continuity on this page) -->
                 <img id="app-logo-useless-page" 
-                     src="${IMAGE_URL}" 
+                     src="${getDynamicLogoUrl()}" 
                      alt="App Logo" 
                      class="w-24 h-24 mx-auto rounded-full border-4 border-white mb-8 object-cover">
 
@@ -844,7 +869,7 @@
             container.innerHTML = `
                 <!-- Logo Placeholder -->
                 <img id="app-logo-useless-result" 
-                     src="${IMAGE_URL}" 
+                     src="${getDynamicLogoUrl()}" 
                      alt="App Logo" 
                      class="w-24 h-24 mx-auto rounded-full border-4 border-white mb-8 object-cover">
                 
@@ -908,7 +933,7 @@
 
                      <!-- Logo Placeholder -->
                      <img id="app-logo-welcome" 
-                          src="${IMAGE_URL}" 
+                          src="${getDynamicLogoUrl()}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                      <!-- END Logo Placeholder: Replace the 'src' above with your ImageBB URL -->
@@ -1022,7 +1047,7 @@
 
                      <!-- Logo Placeholder -->
                      <img id="app-logo-inbox" 
-                          src="${IMAGE_URL}" 
+                          src="${getDynamicLogoUrl()}" 
                           alt="App Logo" 
                           class="w-24 h-24 mx-auto rounded-full border-4 border-black mb-4 object-cover">
                      <!-- END Logo Placeholder: Replace the 'src' above with your ImageBB URL -->
