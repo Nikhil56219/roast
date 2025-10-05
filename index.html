@@ -145,9 +145,9 @@
             // FIX: Use uppercase keys for consistent lookup in getDynamicLogoUrl
             'NIKHIL': "https://placehold.co/96x96/FFD500/111111?text=NIKHIL",
             'SHANMUKH': "https://i.ibb.co/7xPBkktS/Whats-App-Image-2025-10-05-at-12-27-16-fc6f2249.jpg",
-             Add Sahiti and Usmani logos here when ready:
+            // FIX: Added missing commas
             'SAHITI': "https://i.ibb.co/ynftQ02D/Whats-App-Image-2025-10-05-at-12-25-00-25ad8b92.jpg",
-             'USMANI': "https://i.ibb.co/pj32wsZC/Whats-App-Image-2025-10-05-at-12-28-41-e6f3e837.jpg",
+            'USMANI': "https://i.ibb.co/pj32wsZC/Whats-App-Image-2025-10-05-at-12-28-41-e6f3e837.jpg",
         };
 
         const appId = 'roast-station-app'; // Hardcoded unique identifier for your app's data path
@@ -212,11 +212,13 @@
 
         // --- Utility Functions ---
         // NEW FUNCTION: Dynamically choose logo based on current user or default
-        const getDynamicLogoUrl = () => {
-             // Check if user is logged in AND has a custom logo defined (using uppercase for case-insensitive check)
-             const upperName = currentUserName ? currentUserName.toUpperCase() : '';
-             if (upperName && CUSTOM_LOGOS[upperName]) {
-                 return CUSTOM_LOGOS[upperName];
+        const getDynamicLogoUrl = (forUserName = currentUserName) => {
+             // Check if a specific user name is provided (like from the Useless Page result)
+             const checkName = forUserName ? forUserName.toUpperCase() : '';
+             
+             // Check if user is logged in OR a specific name was passed AND has a custom logo defined
+             if (checkName && CUSTOM_LOGOS[checkName]) {
+                 return CUSTOM_LOGOS[checkName];
              }
              // Otherwise, return the main app logo
              return BASE_IMAGE_URL;
@@ -845,6 +847,9 @@
             const roastLine = data && data.roast ? data.roast : "Error: Roast line missing.";
             // New flag to check if the user failed the name entry
             const userIsFriend = data && data.isFriend;
+            
+            // Determine the specific logo URL for the entered name
+            const enteredNameLogoUrl = getDynamicLogoUrl(enteredName);
 
             // Determine the next button action based on whether the name was a friend's name
             let nextButtonHTML;
@@ -867,9 +872,9 @@
             // Increased max-w-xl to max-w-2xl for more horizontal space
             container.className = 'w-full max-w-2xl theme-black-bg p-8 rounded-xl border-white-thin';
             container.innerHTML = `
-                <!-- Logo Placeholder -->
+                <!-- Logo Placeholder: Uses the specific entered name's logo -->
                 <img id="app-logo-useless-result" 
-                     src="${getDynamicLogoUrl()}" 
+                     src="${enteredNameLogoUrl}" 
                      alt="App Logo" 
                      class="w-24 h-24 mx-auto rounded-full border-4 border-white mb-8 object-cover">
                 
